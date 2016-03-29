@@ -78,7 +78,6 @@ int main(int argc, char **argv)
     }
    
     trace_file_name = argv[1];
-<<<<<<< HEAD
 	
 	if (argc == 7)
 	{
@@ -98,8 +97,7 @@ int main(int argc, char **argv)
 		exit(0);
 	}
 	}
-    
-=======
+   
     trace_view_on = (argc == 3); // What?
     
     // here you should extract the cache parameters from the command line
@@ -109,32 +107,6 @@ int main(int argc, char **argv)
     associativity = atoi(argv[6]);
     replacement_policy = atoi(argv[7]);
     
-    // Check that the size of cache, cache block and associativity is a power of two
-    if (checkPowerOfTwo(cache_size)){
-        fprintf(stdout, "\nMake sure that the cache size is a power of 2.");
-        fprintf(stdout, "%d is not a power of 2.", cache_size);
-        exit(0);
-    }
-    if (checkPowerOfTwo(block_size)){
-        fprintf(stdout, "\nMake sure that the block size is a power of 2.");
-        fprintf(stdout, "%d is not a power of 2.", block_size);
-        exit(0);
-    }
-    if (checkPowerOfTwo(associativity)){
-        fprintf(stdout, "\nMake sure that the associativity of the cache sets is a power of 2.");
-        fprintf(stdout, " %d is not a power of 2.", associativity);
-		exit(0);
-    }
-	
-    if ( !(replacement_policy == 0 || replacement_policy == 1) ){
-        fprintf(stdout, "\nMake sure that you pick either 0 for LRU replacement or 1 for FIFO replacement.");
-        fprintf(stdout, " %d is not a valid number.", replacement_policy);
-        exit(0);
-    }
-    
-	// Make an enum based on the parameter passed in for the replacement algorithm
-    enum cache_policy policy;
->>>>>>> 228353570acb0068e65291ebcc04d312398e50ea
     if(replacement_policy){
         policy = FIFO;
     }
