@@ -69,11 +69,21 @@ struct cache_t * cache_create(int size, int blocksize, int assoc, enum cache_pol
 
 int LRU_Replacement(struct cache_t *cp, unsigned long address, char access_type, unsigned long long now) {
 	
+	return 0; //temporary return
 }
 int FIFO_Replacement(struct cache_t *cp, unsigned long address, char access_type, unsigned long long now) {
-	
+	return 0; //temporary return
 }
 
+//////////////////////////////////////////////////////////////////////
+//
+// based on address determine the set to access in cp
+// examine blocks in the set to check hit/miss
+// if miss, determine the victim in the set to replace
+// if update the block list based on the replacement policy
+// return 0 if a hit, 1 if a miss or 2 if a miss_with_write_back
+//
+//////////////////////////////////////////////////////////////////////
 int cache_access(struct cache_t *cp, unsigned long address, char access_type, unsigned long long now)
 {
     int status = 0; //return 0 if a hit, 1 if a miss or 2 if a miss_with_write_back
@@ -95,7 +105,7 @@ int cache_access(struct cache_t *cp, unsigned long address, char access_type, un
 				//write back and update cache
 				//return 2
 	
-	//if srtore (write)
+	//if store (write)
 		
 		//Check if block contains the right data (check that address is within the range)
 		
@@ -112,16 +122,6 @@ int cache_access(struct cache_t *cp, unsigned long address, char access_type, un
 				//write back and update cache
 				//return 2
 	
-	//////////////////////////////////////////////////////////////////////
-    //
-    // Your job:
-    // based on address determine the set to access in cp
-    // examine blocks in the set to check hit/miss
-    // if miss, determine the victim in the set to replace
-    // if update the block list based on the replacement policy
-    // return 0 if a hit, 1 if a miss or 2 if a miss_with_write_back
-    //
-    //////////////////////////////////////////////////////////////////////
 	return status; //return 0 if a hit, 1 if a miss or 2 if a miss_with_write_back
 }
 

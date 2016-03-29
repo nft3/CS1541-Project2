@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include <sys/time.h>
+#include <sys/time.h> FOR LINUX ONLY
 #include "trace_item.h"
 #include "skeleton.h"
 
@@ -17,6 +17,39 @@ unsigned int write_accesses = 0;
 unsigned int hits = 0;
 unsigned int misses = 0;
 unsigned int misses_with_writeback = 0;
+
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
+#include <stdint.h> // portable: uint64_t   MSVC: __int64 
+
+/////////////////////////////////////////////////////////////////////
+//FOR WINDOWS ONLY
+/////////////////////////////////////////////////////////////////////
+/* typedef struct timeval {
+    unsigned long long tv_sec;
+    unsigned long long tv_usec;
+} timeval;
+
+int gettimeofday(struct timeval * tp, struct timezone * tzp)
+{
+    static const uint64_t EPOCH = ((uint64_t) 116444736000000000ULL);
+
+    SYSTEMTIME  system_time;
+    FILETIME    file_time;
+    uint64_t    time;
+
+    GetSystemTime( &system_time );
+    SystemTimeToFileTime( &system_time, &file_time );
+    time =  ((uint64_t)file_time.dwLowDateTime )      ;
+    time += ((uint64_t)file_time.dwHighDateTime) << 32;
+
+    tp->tv_sec  = (unsigned long long) ((time - EPOCH) / 10000000L);
+    tp->tv_usec = (unsigned long long) (system_time.wMilliseconds * 1000);
+    return 0;
+} */
+/////////////////////////////////////////////////////////////////////
+//FOR WINDOWS ONLY
+/////////////////////////////////////////////////////////////////////
 
 void trace_init()
 {
@@ -75,7 +108,6 @@ int main(int argc, char **argv)
 	block_size = 4; //4 bytes = 1 word
 	associativity = 1; //1-way associativity
 	replacement_policy = 0; //0 for LRU, 1 for FIFO
-    cache_access_status = NULL;
 	
     if (argc == 1) {
         fprintf(stdout, "nUSAGE: tv <trace_file> <switch - any character>n");
@@ -98,9 +130,10 @@ int main(int argc, char **argv)
 		}
 		replacement_policy = atoi(argv[6]);
 		if ( !(replacement_policy == 0 || replacement_policy == 1) ){
-		fprintf(stdout, "\nMake sure that you pick either 0 for LRU replacement or 1 for FIFO replacement.");
-		fprintf(stdout, " %d is not a valid number.", replacement_policy);
-		exit(0);
+			fprintf(stdout, "\nMake sure that you pick either 0 for LRU replacement or 1 for FIFO replacement.");
+			fprintf(stdout, " %d is not a valid number.", replacement_policy);
+			exit(0);
+		}
 	}
    
     trace_view_on = (argc == 3); // What?
@@ -144,7 +177,7 @@ int main(int argc, char **argv)
 	}
 	
     // here should call cache_create(cache_size, block_size, associativity, replacement_policy)
-    cp = create_cache(cache_size, block_size, associativity, policy);
+    cp = cache_create(cache_size, block_size, associativity, policy);
     
     while(1) {
         size = trace_get_item(&tr_entry);
@@ -171,7 +204,7 @@ int main(int argc, char **argv)
 				read_accesses = read_accesses + 1;
 				accesses = accesses + 1;
             }
-            if (tr_entry->type == ti_STORE) {
+            else if (tr_entry->type == ti_STORE) {
                 if (trace_view_on) printf("STORE %x n",tr_entry->Addr) ;
                 accesses ++;
                 write_accesses++ ;
@@ -180,6 +213,9 @@ int main(int argc, char **argv)
 				write_accesses =  write_accesses + 1;
 				accesses = accesses + 1;
             }
+			else {
+				cache_access_status = 100; //not a load or store
+			}
             // based on the value returned, update the statisctics for hits, misses and misses_with_writeback
 			if(cache_access_status == 0){ //0 if a hit, 1 if a miss or 2 if a miss_with_write_back
 				hits = hits + 1;
