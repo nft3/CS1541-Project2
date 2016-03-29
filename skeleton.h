@@ -16,9 +16,9 @@ struct cache_blk_t {
     unsigned long tag;
     char valid;
     char dirty;
-    /* Add either a pointer (to construct FIFO or LRU lists)
+    unsigned long long timestamp;
+	/* Add either a pointer (to construct FIFO or LRU lists)
     or a time stamp to implement the replacement polity */
-    struct cache_blk_t *next;
 };
 
 enum cache_policy {
@@ -37,8 +37,7 @@ struct cache_t {
     struct cache_blk_t **blocks;    // cache blocks in the cache
 };
 
-struct cache_t *
-cache_create(int size, int blocksize, int assoc, enum cache_policy policy)
+struct cache_t * cache_create(int size, int blocksize, int assoc, enum cache_policy policy)
 {
     // The cache is represented by a 2-D array of blocks.
     // The first dimension of the 2D array is "nsets" which is the number of sets (entries)
@@ -48,13 +47,11 @@ cache_create(int size, int blocksize, int assoc, enum cache_policy policy)
     int nblocks = 1; // number of blocks in the cache
     int nsets = 1;   // number of sets (entries) in the cache
     
-    //
-    // YOUR JOB: calculate the number of sets and blocks in the cache
-    //
-    // nblocks = X;
-    // nsets = Y;
+	//calculate number of blocks and sets in cache
+	nblocks =  (size*1024)/blocksize;
+	nsets = (size*1024)/(blocksize*assoc);
     
-    struct cache_t *C = (struct cache_t *)calloc(1, sizeof(struct cache_t));
+    struct cache_t * C = (struct cache_t *)calloc(1, sizeof(struct cache_t));
     
     C->nsets = nsets;
     C->bsize = blocksize;
@@ -70,11 +67,52 @@ cache_create(int size, int blocksize, int assoc, enum cache_policy policy)
     return C;
 }
 
-int
-cache_access(struct cache_t *cp, unsigned long address,
-char access_type, unsigned long long now)
+int LRU_Replacement(struct cache_t *cp, unsigned long address, char access_type, unsigned long long now) {
+	
+}
+int FIFO_Replacement(struct cache_t *cp, unsigned long address, char access_type, unsigned long long now) {
+	
+}
+
+int cache_access(struct cache_t *cp, unsigned long address, char access_type, unsigned long long now)
 {
-    //////////////////////////////////////////////////////////////////////
+    int status = 0; //return 0 if a hit, 1 if a miss or 2 if a miss_with_write_back
+	
+	//Use address to get set number and associativity number to access blocks within cashes (tag)
+	
+	//if load (read)
+	
+		//Check if block contains the right data (check that address is within the range)
+			
+		//if yes, return 0
+			
+		//if no, run replacement algorithm (which one to kick out)
+			
+			//if not dirty, 
+				//return 1 and update cache
+			
+			//if dirty
+				//write back and update cache
+				//return 2
+	
+	//if srtore (write)
+		
+		//Check if block contains the right data (check that address is within the range)
+		
+		//if yes, 
+		
+			// update dirty bit return 0 
+			
+		//if no,, run replacement algorithm (which one to kick out)
+		
+			//if not dirty, 
+				//return 1 and update cache
+			
+			//if dirty
+				//write back and update cache
+				//return 2
+	
+	//////////////////////////////////////////////////////////////////////
     //
     // Your job:
     // based on address determine the set to access in cp
@@ -84,7 +122,7 @@ char access_type, unsigned long long now)
     // return 0 if a hit, 1 if a miss or 2 if a miss_with_write_back
     //
     //////////////////////////////////////////////////////////////////////
-	return 0;
+	return status; //return 0 if a hit, 1 if a miss or 2 if a miss_with_write_back
 }
 
 #endif

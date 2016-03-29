@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <sys/time.h>
 #include "trace_item.h"
 #include "skeleton.h"
 
@@ -63,6 +64,10 @@ int main(int argc, char **argv)
     int trace_view_on, cache_size, block_size;
     int associativity, replacement_policy;
 	enum cache_policy policy;
+	struct cache_t *cp;
+	struct timeval gettimeofdayreturnstruct;
+	unsigned long long timestamp_in_microsec;
+	int cache_access_status;
 	
 	//define default
 	trace_view_on = 1;
@@ -70,7 +75,8 @@ int main(int argc, char **argv)
 	block_size = 4; //4 bytes = 1 word
 	associativity = 1; //1-way associativity
 	replacement_policy = 0; //0 for LRU, 1 for FIFO
-    
+    cache_access_status = NULL;
+	
     if (argc == 1) {
         fprintf(stdout, "nUSAGE: tv <trace_file> <switch - any character>n");
         fprintf(stdout, "n(switch) to turn on or off individual item view.nn");
@@ -86,7 +92,7 @@ int main(int argc, char **argv)
 		cache_size = atoi(argv[3]); //in kilobytes
 		block_size = atoi(argv[4]);
 		associativity = atoi(argv[5]);
-		if ((cache_size == 1) || (cache_size%2 != 0) || (block_size%2 != 0) || (associativity == 1) || (associativity%2 != 0)) { //should be restricted to the power of 2
+		if ((cache_size == 1) || (cache_size%2 != 0) || (block_size == 1) || (block_size%2 != 0) || (associativity == 1) || (associativity%2 != 0)) { //should be restricted to the power of 2
 			fprintf(stdout, "Cache size, block size, and block associativity have to be a power of 2.");
 			exit(0);		
 		}
@@ -95,7 +101,6 @@ int main(int argc, char **argv)
 		fprintf(stdout, "\nMake sure that you pick either 0 for LRU replacement or 1 for FIFO replacement.");
 		fprintf(stdout, " %d is not a valid number.", replacement_policy);
 		exit(0);
-	}
 	}
    
     trace_view_on = (argc == 3); // What?
@@ -139,7 +144,7 @@ int main(int argc, char **argv)
 	}
 	
     // here should call cache_create(cache_size, block_size, associativity, replacement_policy)
-    //create_cache(cache_size, block_size, associativity, policy);
+    cp = create_cache(cache_size, block_size, associativity, policy);
     
     while(1) {
         size = trace_get_item(&tr_entry);
@@ -155,29 +160,37 @@ int main(int argc, char **argv)
             break;
         }
         else{              /* process only loads and stores */;
+			gettimeofday(&gettimeofdayreturnstruct, NULL);
+			timestamp_in_microsec = (unsigned long long)(1000000ULL * gettimeofdayreturnstruct.tv_sec + gettimeofdayreturnstruct.tv_usec);
             if (tr_entry->type == ti_LOAD) {
                 if (trace_view_on) printf("LOAD %x n",tr_entry->Addr) ;
                 accesses ++;
                 read_accesses++ ;
                 // call cache_access(struct cache_t *cp, tr_entry->Addr, access_type)
+				cache_access_status = cache_access(cp, tr_entry->Addr, tr_entry->type, timestamp_in_microsec);
+				read_accesses = read_accesses + 1;
+				accesses = accesses + 1;
             }
             if (tr_entry->type == ti_STORE) {
                 if (trace_view_on) printf("STORE %x n",tr_entry->Addr) ;
                 accesses ++;
                 write_accesses++ ;
                 // call cache_access(struct cache_t *cp, tr_entry->Addr, access_type)
+				cache_access_status = cache_access(cp, tr_entry->Addr, tr_entry->type, timestamp_in_microsec);
+				write_accesses =  write_accesses + 1;
+				accesses = accesses + 1;
             }
             // based on the value returned, update the statisctics for hits, misses and misses_with_writeback
+			if(cache_access_status == 0){ //0 if a hit, 1 if a miss or 2 if a miss_with_write_back
+				hits = hits + 1;
+			}
+			else if (cache_access_status == 1) {
+				misses = misses + 1;
+			}
+			else if (cache_access_status == 2) {
+				misses_with_writeback = misses_with_writeback + 1;
+			}
         }
-		if(trace_view_on == 1) {
-			printf("\n\nTrace:");
-			printf("\nCache Accesses: %d", accesses);
-			printf("\nCache Read Accesses: %d", read_accesses);
-			printf("\nCache Write Accesses: %d", write_accesses);
-			printf("\nCache Hits: %d", hits);
-			printf("\nCache Misses: %d", misses);
-			printf("\nCache Writebacks: %d", misses_with_writeback);
-		}
     }
 	
     trace_uninit();
