@@ -100,8 +100,15 @@ int main(int argc, char **argv)
     }
     if (checkPowerOfTwo(associativity)){
         fprintf(stdout, "nMake sure that the associativity of the cache sets is a power of 2.");
-        fprintf(stdout, "%d is not a power of 2.", associativity);
+        fprintf(stdout, " %d is not a power of 2.", associativity);
+		exit(0);
     }
+	
+	if ( !(replacement_policy == 0 || replacement_policy == 1) ){
+		fprintf(stdout, "\nMake sure that you pick either 0 for LRU replacement or 1 for FIFO replacement.");
+		fprintf(stdout, " %d is not a valid number.", replacement_policy);
+		exit(0);
+	}
     
     enum cache_policy policy;
     if(replacement_policy){
