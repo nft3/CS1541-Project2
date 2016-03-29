@@ -84,6 +84,7 @@ char access_type, unsigned long long now)
     // return 0 if a hit, 1 if a miss or 2 if a miss_with_write_back
     //
     //////////////////////////////////////////////////////////////////////
+	return 0;
 }
 
 #endif
