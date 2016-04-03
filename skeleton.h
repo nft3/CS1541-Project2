@@ -11,14 +11,15 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <math.h>
+#include <sys/time.h>
+#include "trace_item"
 
 struct cache_blk_t {
     unsigned long tag;
     char valid;
     char dirty;
     unsigned long long timestamp;
-	/* Add either a pointer (to construct FIFO or LRU lists)
-    or a time stamp to implement the replacement polity */
 };
 
 enum cache_policy {
@@ -48,8 +49,8 @@ struct cache_t * cache_create(int size, int blocksize, int assoc, enum cache_pol
     int nsets = 1;   // number of sets (entries) in the cache
     
 	//calculate number of blocks and sets in cache
-	nblocks =  (size*1024)/blocksize;
-	nsets = (size*1024)/(blocksize*assoc);
+	nblocks = (size * 1024) / blocksize;
+	nsets = (size * 1024) / (blocksize * assoc);
     
     struct cache_t * C = (struct cache_t *)calloc(1, sizeof(struct cache_t));
     
@@ -67,12 +68,191 @@ struct cache_t * cache_create(int size, int blocksize, int assoc, enum cache_pol
     return C;
 }
 
-int LRU_Replacement(struct cache_t *cp, unsigned long address, char access_type, unsigned long long now) {
-	
-	return 0; //temporary return
+// Constructs a new block to be put in the set
+void constructNewBlock(struct cache_blk_t *newBlock, unsigned long tag, unsigned long long now){
+	newBlock->valid = 1;
+	newBlock->tag = tag;
+	newBlock->dirty = 0;
+	newBlock->timestamp = now;
 }
-int FIFO_Replacement(struct cache_t *cp, unsigned long address, char access_type, unsigned long long now) {
-	return 0; //temporary return
+
+// Returns the index of the oldest block in the set
+int findOldestBlock(struct cache_t *cp, int set){
+	int index = cp->blocks[set][0]->timestamp, i;
+
+	for(i = 1; i < cp->assoc; i++){
+		if(cp->blocks[set][i]->timestamp < cp->blocks[set][i-1]->timestamp){
+			index = i;
+		}
+	}
+
+	return index;
+}
+
+/*
+	For LRU replacement, we have to find the element in the set of the cache that is the least recently used.
+	That means we need to go through the entire set of the cache and compare timestamps to find the one that is 
+	the furthest in the past.
+*/
+int LRU_Replacement(struct cache_t *cp, unsigned long address, int set, char access_type, unsigned long long now) {
+	
+	int returnValue = -1, i;
+
+	// The addresses are 32 bits long. Use this to find the tag.
+	unsigned log tag = 32 - log2(cp->bsize) - log2(cp->nsets); 
+
+	// Now let's check to see if the set is full. We can do that by seeing if every member of the struct is 0.
+	for(i = 0; i < cp->assoc; i++){
+
+		// We encounter tags that are the same, we have to update it in the cache.
+		// If it is a store instruction mark as dirty, loads just read so not necessary
+		// Also, change the valid bit to 1 if it is already not.
+		// Update the time stamp for LRU!
+
+		if(cp->blocks[set][i]->tag == tag){
+			// If it is a hit, we only have to set the dirty bit on a store. On a read it doesn't matter.
+			if(access_type == ti_store){
+				cp->blocks[set][i]->dirty = 1;
+			}
+			cp->blocks[set][i]->valid = 1;
+			cp->blocks[set][i]->timestamp = now; // Updated time stamp for a hit!
+			returnValue = 0;
+			break;
+		}
+
+		// We are encountering a block that has not yet been occupied. We can place it here, It is a miss.
+		else if(!cp->blocks[set][i]->valid && !cp[set][i]->tag && !cp[set][i]->dirty && !cp[set][i]->timestamp){ 
+
+			// Construct a new block
+			struct cache_blk_t *newBlock = (struct cache_blk_t *)calloc(1, sizeof(struct cache_blk_t));
+			constructNewBlock(newBlock, tag, now);
+
+			// Now we can add this block where there isn't a block yet
+			cp->block[set][i] = *newBlock;
+
+			// We have to write back to memory if it is a store instruction.
+			if(access_type == ti_store){
+				returnValue = 2;
+			}
+			else if(access_type == ti_load){
+				returnValue = 1;
+			}
+
+			break; 
+		}
+
+		// We have reached the end of the set and we have to evict the oldest
+		// NOTE: Maybe this can be refactored to be outside of for loop?
+		else if(i == (cp->assoc - 1)){
+			// First let's construct a new block
+			struct cache_blk_t *newBlock = (struct cache_blk_t *)calloc(1, sizeof(struct cache_blk_t));
+			constructNewBlock(newBlock, tag, now);
+
+			// Find the oldest block
+			int indexOfOldestBlock = findOldestBlock(cp, set);
+
+			// Now that we have the index of the oldest block, let's overwrite what is there 
+			cp->blocks[set][indexOfOldestBlock] = *newBlock;
+			
+			// We have to write back to memory if it is a store instruction
+			if(access_type == ti_store){
+				returnValue = 2;
+			}
+			else if(access_type == ti_load){
+				returnValue = 1;
+			}
+
+			break;
+		}
+
+	}
+
+	return returnValue;
+}
+
+/*
+	For FIFO (First In First Out) replacement, we need to find the element that is at the the start of the 
+	list of cache blocks in a set.
+*/ 
+
+/**
+	FIFO IS DIFFERENT THAN LRU BECAUSE YOU DON'T UPDATE THE TIME STAMP IF THERE IS A HIT. IF WE UPDATE THE TIMESTAMP
+	EVERYTIME, THEN IT IS LRU.
+*/
+int FIFO_Replacement(struct cache_t *cp, unsigned long address, int set, char access_type, unsigned long long now) {
+	
+	int returnValue = -1, i;
+
+	// The addresses are 32 bits long. Use this to find the tag.
+	unsigned log tag = 32 - log2(cp->bsize) - log2(cp->nsets); 
+
+	// Loop through the set
+	for(i = 0; i < cp->assoc; i++){
+
+		// We encounter tags that are the same, we have to update it in the cache.
+		// If it is a store instruction mark as dirty, loads just read so not necessary
+		// Also, change the valid bit to 1 if it is already not.
+		// DO NOT update the time stamp for FIFO!
+
+		if(cp->blocks[set][i]->tag == tag){
+			// If it is a hit, we only have to set the dirty bit on a store. On a read it doesn't matter.
+			if(access_type == ti_store){
+				cp->blocks[set][i]->dirty = 1;
+			}
+			cp->blocks[set][i]->valid = 1;
+			returnValue = 0;
+			break;
+		}
+
+		// If there is a circumstance where the set is not yet full and there is an empty space. This is a miss.
+		// (If everything is 0, that's how we know that nothing is in that space in the set yet)
+		else if(!cp->blocks[set][i]->valid && !cp[set][i]->tag && !cp[set][i]->dirty && !cp[set][i]->timestamp){ 
+
+			// Construct a new block
+			struct cache_blk_t *newBlock = (struct cache_blk_t *)calloc(1, sizeof(struct cache_blk_t));
+			constructNewBlock(newBlock, tag, now);
+
+			// Now we can add this block where there isn't a block yet
+			cp->block[set][i] = *newBlock;
+
+			// We have to write back to memory if it is a store instruction.
+			if(access_type == ti_store){
+				returnValue = 2;
+			}
+			else if(access_type == ti_load){
+				returnValue = 1;
+			}
+
+			break; 
+		}
+
+		// We have reached the end of the set and we have to evict the oldest
+		// NOTE: Maybe this can be refactored to be outside of for loop?
+		else if(i == (cp->assoc - 1)){
+			// First let's construct a new block
+			struct cache_blk_t *newBlock = (struct cache_blk_t *)calloc(1, sizeof(struct cache_blk_t));
+			constructNewBlock(newBlock, tag, now);
+
+			// Find the oldest block
+			int indexOfOldestBlock = findOldestBlock(cp, set);
+
+			// Now that we have the index of the oldest block, let's overwrite what is there 
+			cp->blocks[set][indexOfOldestBlock] = *newBlock;
+			
+			// We have to write back to memory if it is a store instruction
+			if(access_type == ti_store){
+				returnValue = 2;
+			}
+			else if(access_type == ti_load){
+				returnValue = 1;
+			}
+
+			break;
+		}
+
+	}
+
+	return returnValue;
 }
 
 //////////////////////////////////////////////////////////////////////
