@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include <sys/time.h> FOR LINUX ONLY
+//#include <sys/time.h> FOR LINUX ONLY
 #include "trace_item.h"
 #include "skeleton.h"
 
@@ -25,7 +25,7 @@ unsigned int misses_with_writeback = 0;
 /////////////////////////////////////////////////////////////////////
 //FOR WINDOWS ONLY
 /////////////////////////////////////////////////////////////////////
-/* typedef struct timeval {
+typedef struct timeval {
     unsigned long long tv_sec;
     unsigned long long tv_usec;
 } timeval;
@@ -46,7 +46,7 @@ int gettimeofday(struct timeval * tp, struct timezone * tzp)
     tp->tv_sec  = (unsigned long long) ((time - EPOCH) / 10000000L);
     tp->tv_usec = (unsigned long long) (system_time.wMilliseconds * 1000);
     return 0;
-} */
+}
 /////////////////////////////////////////////////////////////////////
 //FOR WINDOWS ONLY
 /////////////////////////////////////////////////////////////////////
@@ -124,8 +124,8 @@ int main(int argc, char **argv)
 		cache_size = atoi(argv[3]); //in kilobytes
 		block_size = atoi(argv[4]);
 		associativity = atoi(argv[5]);
-		if ((cache_size == 1) || (cache_size%2 != 0) || (block_size == 1) || (block_size%2 != 0) || (associativity == 1) || (associativity%2 != 0)) { //should be restricted to the power of 2
-			fprintf(stdout, "Cache size, block size, and block associativity have to be a power of 2.");
+		if ((cache_size != (cache_size & -cache_size)) || (block_size != (block_size & -block_size)) || (associativity != (associativity & -associativity))) { //should be restricted to the power of 2
+			fprintf(stdout, "Cache size, block size, and block associativity have to be a power of 2. (For example: 1, 2, 4, 8, 16, ...");
 			exit(0);		
 		}
 		replacement_policy = atoi(argv[6]);

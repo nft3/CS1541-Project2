@@ -15,6 +15,8 @@
 #include <sys/time.h>
 #include "trace_item"
 
+#define CHECK_BIT(var,pos) ((var) & (1<<(pos))) //macro for checking if bit at position pos is 1
+
 struct cache_blk_t {
     unsigned long tag;
     char valid;
@@ -266,43 +268,67 @@ int FIFO_Replacement(struct cache_t *cp, unsigned long address, int set, char ac
 //////////////////////////////////////////////////////////////////////
 int cache_access(struct cache_t *cp, unsigned long address, char access_type, unsigned long long now)
 {
-    int status = 0; //return 0 if a hit, 1 if a miss or 2 if a miss_with_write_back
+	int block_size; //in bytes
+	int number_of_sets;
+	int n_bits_for_block_offset;
+	int n_bits_for_set_number;
+	int n_bits_for_tag;
+	unsigned long set; //index
+	unsigned long tag;
+	int i; //multipurpose variable
 	
-	//Use address to get set number and associativity number to access blocks within cashes (tag)
+	//Use address to get set number and tag to access blocks within cashes
+	block_size = cp->bsize;
+	number_of_sets = cp->nsets;
 	
-	//if load (read)
+	n_bits_for_block_offset = 0;
+	for(i = 0; i < (sizeof(block_size)*8); i++) {
+		n_bits_for_block_offset =  n_bits_for_block_offset + 1;
+		if(CHECK_BIT(block_size, i) == 1) {
+			break;
+		}
+	}
 	
-		//Check if block contains the right data (check that address is within the range)
-			
-		//if yes, return 0
-			
-		//if no, run replacement algorithm (which one to kick out)
-			
-			//if not dirty, 
-				//return 1 and update cache
-			
-			//if dirty
-				//write back and update cache
-				//return 2
+	n_bits_for_set_number = 0;
+	for(i = 0; i < (sizeof(number_of_sets)*8); i++) {
+		n_bits_for_set_number =  n_bits_for_set_number + 1;
+		if(CHECK_BIT(number_of_sets, i) == 1) {
+			break;
+		}
+	}	
 	
-	//if store (write)
-		
-		//Check if block contains the right data (check that address is within the range)
-		
-		//if yes, 
-		
-			// update dirty bit return 0 
-			
-		//if no,, run replacement algorithm (which one to kick out)
-		
-			//if not dirty, 
-				//return 1 and update cache
-			
-			//if dirty
-				//write back and update cache
-				//return 2
+	n_bits_for_tag = sizeof(address)*8 - n_bits_for_set_number - n_bits_for_block_offset;
 	
-	return status; //return 0 if a hit, 1 if a miss or 2 if a miss_with_write_back
-}
+	tag = address >> (n_bits_for_set_number + n_bits_for_block_offset);
+	set = address & (~(tag<<(n_bits_for_set_number + n_bits_for_block_offset)));
+	set = set >> n_bits_for_block_offset;
+	
+	//Check if block contains the right data (check that address is within the range)
+	for(i = 0; i < cp->assoc; i++){
+		if ((cp->blocks[(int)set][i]->valid) && (cp->blocks[(int)set][i]->tag == tag)) { //if yes, return 0
+			return 0; //hit
+		} 
+	}
+	//if no, run replacement algorithm (which one to kick out)
+	if(cp->policy == LRU) {
+		if(LRU_Replacement(cp, address, (int)set, access_type, now)== 1){//if not dirty, 
+			return 1; //return 1 and update cache
+		}
+		else { //if dirty
+			//write back and update cache
+			return 2;	//return 2
+		}
+	}
+	else {
+		if(FIFO_Replacement(cp, address, (int)set, access_type, now)== 1){//if not dirty, 
+			return 1; //return 1 and update cache
+		}
+		else { //if dirty
+			//write back and update cache
+			return 2;	//return 2
+		}			
+	}
 
+	
+}
 #endif
