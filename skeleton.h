@@ -11,7 +11,6 @@
 
 #include <stdlib.h>
 #include <stdio.h>
-#include <math.h>
 #include <sys/time.h> //only for linux
 #include "trace_item.h"
 
@@ -123,9 +122,6 @@ int findOldestBlock(struct cache_t *cp, int set){
 	return index;
 }
 
-double logBaseTwo(int number){
-	return log((double)number) / log(2);
-}
 
 /*
 	For LRU replacement, we have to find the element in the set of the cache that is the least recently used.
