@@ -132,14 +132,11 @@ double logBaseTwo(int number){
 	That means we need to go through the entire set of the cache and compare timestamps to find the one that is 
 	the furthest in the past.
 */
-int LRU_Replacement(struct cache_t *cp, unsigned long address, int set, char access_type, unsigned long long now) {
+int LRU_Replacement(struct cache_t *cp, unsigned long address, int set, int tag, char access_type, unsigned long long now) {
 
 	int returnValue = -1, i;
 
-	// The addresses are 32 bits long. Use this to find the tag.
-	unsigned long tag = 32 - (unsigned long)logBaseTwo(cp->bsize) - (unsigned long)logBaseTwo(cp->nsets);
-
-	// Now let's check to see if the set is full. We can do that by seeing if every member of the struct is 0.
+	// Loop through all the blocks that are in the set in the cache, using assoc to determine how many blocks are in the set
 	for(i = 0; i < cp->assoc; i++){
 
 		// We encounter tags that are the same, we have to update it in the cache.
@@ -152,23 +149,23 @@ int LRU_Replacement(struct cache_t *cp, unsigned long address, int set, char acc
 			if(access_type == ti_STORE){
 				cp->blocks[set][i].dirty = 1;
 			}
-			cp->blocks[set][i].valid = 1;
+			cp->blocks[set][i].valid = 1; // We are using it in memory, so it is valid
 			cp->blocks[set][i].timestamp = now; // Updated time stamp for a hit!
 			returnValue = 0;
 			break;
 		}
 
-		// We are encountering a block that has not yet been occupied. We can place it here, It is a miss.
+		// We are encountering a way in the set that has not yet been occupied. We can place it here, It is a miss.
 		else if(!cp->blocks[set][i].valid && !cp->blocks[set][i].tag && !cp->blocks[set][i].dirty && !cp->blocks[set][i].timestamp){ 
 
 			// Construct a new block
 			struct cache_blk_t *newBlock = (struct cache_blk_t *)calloc(1, sizeof(struct cache_blk_t));
 			constructNewBlock(newBlock, tag, now);
 
-			// Now we can add this block where there isn't a block yet
+			// Add this block to the free space in the cache
 			cp->blocks[set][i] = *newBlock;
 
-			// We have to write back to memory if it is a store instruction.
+			// We have to write back to memory if it is a store instruction
 			if(access_type == ti_STORE){
 				returnValue = 2;
 			}
@@ -202,7 +199,6 @@ int LRU_Replacement(struct cache_t *cp, unsigned long address, int set, char acc
 
 			break;
 		}
-
 	}
 
 	return returnValue;
@@ -217,12 +213,9 @@ int LRU_Replacement(struct cache_t *cp, unsigned long address, int set, char acc
 	FIFO IS DIFFERENT THAN LRU BECAUSE YOU DON'T UPDATE THE TIME STAMP IF THERE IS A HIT. IF WE UPDATE THE TIMESTAMP
 	EVERYTIME, THEN IT IS LRU.
 */
-int FIFO_Replacement(struct cache_t *cp, unsigned long address, int set, char access_type, unsigned long long now) {
+int FIFO_Replacement(struct cache_t *cp, unsigned long address, int set, int tag, char access_type, unsigned long long now) {
 	
 	int returnValue = -1, i;
-
-	// The addresses are 32 bits long. Use this to find the tag.
-	unsigned long tag = 32 - (unsigned long)logBaseTwo(cp->bsize) - (unsigned long)logBaseTwo(cp->nsets);
 
 	// Loop through the set
 	for(i = 0; i < cp->assoc; i++){
@@ -367,7 +360,7 @@ int cache_access(struct cache_t *cp, unsigned long address, char access_type, FI
 	}
 	//if no, run replacement algorithm (which one to kick out)
 	if(cp->policy == LRU) {
-		if(LRU_Replacement(cp, address, (int)set, access_type, now)== 1){//if not dirty, 
+		if(LRU_Replacement(cp, address, (int)set, (int) tag, access_type, now)== 1){//if not dirty, 
 			return 1; //return 1 and update cache
 		}
 		else { //if dirty
@@ -376,7 +369,7 @@ int cache_access(struct cache_t *cp, unsigned long address, char access_type, FI
 		}
 	}
 	else {
-		if(FIFO_Replacement(cp, address, (int)set, access_type, now)== 1){//if not dirty, 
+		if(FIFO_Replacement(cp, address, (int)set, (int)tag, access_type, now)== 1){//if not dirty, 
 			return 1; //return 1 and update cache
 		}
 		else { //if dirty

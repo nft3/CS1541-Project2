@@ -47,5 +47,25 @@ int main(){
 	printf("firstNum: %d\n", a->x[3][1].firstNum);
 	printf("secondNum: %d\n", a->x[4][2].secondNum);
 
+
+	// Make a new twoNums
+	struct twoNums b;
+	b.firstNum = 0;
+	b.secondNum = 0; 
+
+	// Now try to free what is there
+	//struct twoNums *temp = a->x[1][1];
+	//free(temp);
+
+	printf("Before firstNum: %d\n", a->x[1][1].firstNum);
+	printf("Before secondNum: %d\n", a->x[1][1].secondNum);
+
+
+	// Add now
+	a->x[1][1] = b;
+
+	printf("b firstNum: %d\n", a->x[1][1].firstNum);
+	printf("b secondNum: %d\n", a->x[1][1].secondNum);
+
 	free(a);
 }
