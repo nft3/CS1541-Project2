@@ -12,10 +12,42 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
-#include <sys/time.h>
-#include "trace_item"
+#include <sys/time.h> //only for linux
+#include "trace_item.h"
 
 #define CHECK_BIT(var,pos) ((var) & (1<<(pos))) //macro for checking if bit at position pos is 1
+
+/////////////////////////////////////////////////////////////////////
+//FOR WINDOWS ONLY
+/////////////////////////////////////////////////////////////////////
+/* #define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
+#include <stdint.h> // portable: uint64_t   MSVC: __int64
+
+typedef struct timeval {
+    unsigned long long tv_sec;
+    unsigned long long tv_usec;
+} timeval;
+
+int gettimeofday(struct timeval * tp, struct timezone * tzp) {
+    static const uint64_t EPOCH = ((uint64_t) 116444736000000000ULL);
+
+    SYSTEMTIME  system_time;
+    FILETIME    file_time;
+    uint64_t    time;
+
+    GetSystemTime( &system_time );
+    SystemTimeToFileTime( &system_time, &file_time );
+    time =  ((uint64_t)file_time.dwLowDateTime )      ;
+    time += ((uint64_t)file_time.dwHighDateTime) << 32;
+
+    tp->tv_sec  = (unsigned long long) ((time - EPOCH) / 10000000L);
+    tp->tv_usec = (unsigned long long) (system_time.wMilliseconds * 1000);
+    return 0;
+} */
+/////////////////////////////////////////////////////////////////////
+//FOR WINDOWS ONLY
+/////////////////////////////////////////////////////////////////////
 
 struct cache_blk_t {
     unsigned long tag;
@@ -80,10 +112,10 @@ void constructNewBlock(struct cache_blk_t *newBlock, unsigned long tag, unsigned
 
 // Returns the index of the oldest block in the set
 int findOldestBlock(struct cache_t *cp, int set){
-	int index = cp->blocks[set][0]->timestamp, i;
+	int index = cp->blocks[set][0].timestamp, i;
 
 	for(i = 1; i < cp->assoc; i++){
-		if(cp->blocks[set][i]->timestamp < cp->blocks[set][i-1]->timestamp){
+	if(cp->blocks[set][i].timestamp < cp->blocks[set][i-1].timestamp){
 			index = i;
 		}
 	}
@@ -101,7 +133,7 @@ int LRU_Replacement(struct cache_t *cp, unsigned long address, int set, char acc
 	int returnValue = -1, i;
 
 	// The addresses are 32 bits long. Use this to find the tag.
-	unsigned log tag = 32 - log2(cp->bsize) - log2(cp->nsets); 
+	unsigned long tag = 32 - log2(cp->bsize) - log2(cp->nsets); 
 
 	// Now let's check to see if the set is full. We can do that by seeing if every member of the struct is 0.
 	for(i = 0; i < cp->assoc; i++){
@@ -111,32 +143,32 @@ int LRU_Replacement(struct cache_t *cp, unsigned long address, int set, char acc
 		// Also, change the valid bit to 1 if it is already not.
 		// Update the time stamp for LRU!
 
-		if(cp->blocks[set][i]->tag == tag){
+		if(cp->blocks[set][i].tag == tag){
 			// If it is a hit, we only have to set the dirty bit on a store. On a read it doesn't matter.
-			if(access_type == ti_store){
-				cp->blocks[set][i]->dirty = 1;
+			if(access_type == ti_STORE){
+				cp->blocks[set][i].dirty = 1;
 			}
-			cp->blocks[set][i]->valid = 1;
-			cp->blocks[set][i]->timestamp = now; // Updated time stamp for a hit!
+			cp->blocks[set][i].valid = 1;
+			cp->blocks[set][i].timestamp = now; // Updated time stamp for a hit!
 			returnValue = 0;
 			break;
 		}
 
 		// We are encountering a block that has not yet been occupied. We can place it here, It is a miss.
-		else if(!cp->blocks[set][i]->valid && !cp[set][i]->tag && !cp[set][i]->dirty && !cp[set][i]->timestamp){ 
+		else if(!cp->blocks[set][i].valid && !cp->blocks[set][i].tag && !cp->blocks[set][i].dirty && !cp->blocks[set][i].timestamp){ 
 
 			// Construct a new block
 			struct cache_blk_t *newBlock = (struct cache_blk_t *)calloc(1, sizeof(struct cache_blk_t));
 			constructNewBlock(newBlock, tag, now);
 
 			// Now we can add this block where there isn't a block yet
-			cp->block[set][i] = *newBlock;
+			cp->blocks[set][i] = *newBlock;
 
 			// We have to write back to memory if it is a store instruction.
-			if(access_type == ti_store){
+			if(access_type == ti_STORE){
 				returnValue = 2;
 			}
-			else if(access_type == ti_load){
+			else if(access_type == ti_LOAD){
 				returnValue = 1;
 			}
 
@@ -157,10 +189,10 @@ int LRU_Replacement(struct cache_t *cp, unsigned long address, int set, char acc
 			cp->blocks[set][indexOfOldestBlock] = *newBlock;
 			
 			// We have to write back to memory if it is a store instruction
-			if(access_type == ti_store){
+			if(access_type == ti_STORE){
 				returnValue = 2;
 			}
-			else if(access_type == ti_load){
+			else if(access_type == ti_LOAD){
 				returnValue = 1;
 			}
 
@@ -186,7 +218,7 @@ int FIFO_Replacement(struct cache_t *cp, unsigned long address, int set, char ac
 	int returnValue = -1, i;
 
 	// The addresses are 32 bits long. Use this to find the tag.
-	unsigned log tag = 32 - log2(cp->bsize) - log2(cp->nsets); 
+	unsigned long tag = 32 - log2(cp->bsize) - log2(cp->nsets); 
 
 	// Loop through the set
 	for(i = 0; i < cp->assoc; i++){
@@ -196,32 +228,32 @@ int FIFO_Replacement(struct cache_t *cp, unsigned long address, int set, char ac
 		// Also, change the valid bit to 1 if it is already not.
 		// DO NOT update the time stamp for FIFO!
 
-		if(cp->blocks[set][i]->tag == tag){
+		if(cp->blocks[set][i].tag == tag){
 			// If it is a hit, we only have to set the dirty bit on a store. On a read it doesn't matter.
-			if(access_type == ti_store){
-				cp->blocks[set][i]->dirty = 1;
+			if(access_type == ti_STORE){
+				cp->blocks[set][i].dirty = 1;
 			}
-			cp->blocks[set][i]->valid = 1;
+			cp->blocks[set][i].valid = 1;
 			returnValue = 0;
 			break;
 		}
 
 		// If there is a circumstance where the set is not yet full and there is an empty space. This is a miss.
 		// (If everything is 0, that's how we know that nothing is in that space in the set yet)
-		else if(!cp->blocks[set][i]->valid && !cp[set][i]->tag && !cp[set][i]->dirty && !cp[set][i]->timestamp){ 
+		else if(!cp->blocks[set][i].valid && !cp->blocks[set][i].tag && !cp->blocks[set][i].dirty && !cp->blocks[set][i].timestamp){ 
 
 			// Construct a new block
 			struct cache_blk_t *newBlock = (struct cache_blk_t *)calloc(1, sizeof(struct cache_blk_t));
 			constructNewBlock(newBlock, tag, now);
 
 			// Now we can add this block where there isn't a block yet
-			cp->block[set][i] = *newBlock;
+			cp->blocks[set][i] = *newBlock;
 
 			// We have to write back to memory if it is a store instruction.
-			if(access_type == ti_store){
+			if(access_type == ti_STORE){
 				returnValue = 2;
 			}
-			else if(access_type == ti_load){
+			else if(access_type == ti_LOAD){
 				returnValue = 1;
 			}
 
@@ -242,10 +274,10 @@ int FIFO_Replacement(struct cache_t *cp, unsigned long address, int set, char ac
 			cp->blocks[set][indexOfOldestBlock] = *newBlock;
 			
 			// We have to write back to memory if it is a store instruction
-			if(access_type == ti_store){
+			if(access_type == ti_STORE){
 				returnValue = 2;
 			}
-			else if(access_type == ti_load){
+			else if(access_type == ti_LOAD){
 				returnValue = 1;
 			}
 
@@ -303,9 +335,10 @@ int cache_access(struct cache_t *cp, unsigned long address, char access_type, un
 	set = address & (~(tag<<(n_bits_for_set_number + n_bits_for_block_offset)));
 	set = set >> n_bits_for_block_offset;
 	
+	
 	//Check if block contains the right data (check that address is within the range)
 	for(i = 0; i < cp->assoc; i++){
-		if ((cp->blocks[(int)set][i]->valid) && (cp->blocks[(int)set][i]->tag == tag)) { //if yes, return 0
+		if ((cp->blocks[(int)set][i].valid) && (cp->blocks[(int)set][i].tag == tag)) { //if yes, return 0
 			return 0; //hit
 		} 
 	}

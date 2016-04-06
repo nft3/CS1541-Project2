@@ -1,5 +1,5 @@
 #include <stdio.h>
-//#include <sys/time.h> FOR LINUX ONLY
+#include <sys/time.h> FOR LINUX ONLY
 #include "trace_item.h"
 #include "skeleton.h"
 
@@ -16,40 +16,7 @@ unsigned int read_accesses = 0;
 unsigned int write_accesses = 0;
 unsigned int hits = 0;
 unsigned int misses = 0;
-unsigned int misses_with_writeback = 0;
-
-#define WIN32_LEAN_AND_MEAN
-#include <Windows.h>
-#include <stdint.h> // portable: uint64_t   MSVC: __int64 
-
-/////////////////////////////////////////////////////////////////////
-//FOR WINDOWS ONLY
-/////////////////////////////////////////////////////////////////////
-typedef struct timeval {
-    unsigned long long tv_sec;
-    unsigned long long tv_usec;
-} timeval;
-
-int gettimeofday(struct timeval * tp, struct timezone * tzp)
-{
-    static const uint64_t EPOCH = ((uint64_t) 116444736000000000ULL);
-
-    SYSTEMTIME  system_time;
-    FILETIME    file_time;
-    uint64_t    time;
-
-    GetSystemTime( &system_time );
-    SystemTimeToFileTime( &system_time, &file_time );
-    time =  ((uint64_t)file_time.dwLowDateTime )      ;
-    time += ((uint64_t)file_time.dwHighDateTime) << 32;
-
-    tp->tv_sec  = (unsigned long long) ((time - EPOCH) / 10000000L);
-    tp->tv_usec = (unsigned long long) (system_time.wMilliseconds * 1000);
-    return 0;
-}
-/////////////////////////////////////////////////////////////////////
-//FOR WINDOWS ONLY
-/////////////////////////////////////////////////////////////////////
+unsigned int misses_with_writeback = 0; 
 
 void trace_init()
 {
